@@ -19,7 +19,7 @@ $plugin_info = array(
 	'pi_author_email'	=>'pvledoux@gmail.com',
 	'pi_author_url'		=> 'http://twitter.com/pvledoux/',
 	'pi_description'	=> 'Returns the list of channels for a site',
-	'pi_usage'		=> Pvl_getchannels::usage()
+	'pi_usage'		=> Getchannels::usage()
 );
 
 class Getchannels {
@@ -68,53 +68,66 @@ class Getchannels {
 	 */
 	private function _fetch()
 	{
-		//Get parameter
-		$site_id = $this->EE->TMPL->fetch_param('site_id');
-		$site_id = $site_id ? $site_id : $this->_ee->config->item('site_id');
+		//Get parameters
+		$site_id = $this->EE->TMPL->fetch_param('site_id') ? $this->EE->TMPL->fetch_param('site_id') : $this->_ee->config->item('site_id');
+		$restricted = $this->EE->TMPL->fetch_param('restricted') ? $this->EE->TMPL->fetch_param('restricted') : TRUE;
 
 		//check site id
 		if ($site_id == "" && !is_numeric($site_id)) {
+			
 			$this->return_data =  "ERROR: site_id parameter MUST BE supplied and numeric.";
+
 		} else {
 
 			//Check if cache is available
 			if ( ! isset($this->EE->session->cache['getchannels'][$site_id]['channels'])) {
 
 				$this->EE->db->select('exp_channels.channel_id, exp_channels.channel_name, exp_channels.channel_title, COUNT(exp_channel_data.entry_id) as total_entries')
-								->from('exp_channels')
-								->join('exp_channel_data', 'exp_channels.channel_id = exp_channel_data.channel_id', 'left')
-								->where('exp_channels.site_id', $site_id)
-								->group_by('exp_channels.channel_id')
-								->order_by('exp_channels.channel_name', 'ASC');
+						->from('exp_channels')
+						->join('exp_channel_data', 'exp_channels.channel_id = exp_channel_data.channel_id', 'left')
+						->where('exp_channels.site_id', $site_id)
+						->group_by('exp_channels.channel_id')
+						->order_by('exp_channels.channel_name', 'ASC');
 
 				$channels = $this->EE->db->get()->result_array();
 
 				if (count($channels) === 0) {
-					$results[] = array('no_results' => TRUE);
+					
+					$results[] = $this->EE->TMPL->no_results();
+
 				} else {
 
-					//Check channels member groups
-					$this->EE->db->select('*')
+					// Check channels member groups?
+					// Omitting if member_group is 1 (Super Admin)
+					if ($this->EE->session->userdata["group_id"] != 1 AND ($restricted === TRUE OR $restricted === 'yes')) {
+						
+						$this->EE->db->select('*')
 								->from('exp_channel_member_groups')
 								->where('exp_channel_member_groups.group_id', $this->EE->session->userdata["group_id"]);
 
-					$groups = $this->EE->db->get()->result_array();
+						$groups = $this->EE->db->get()->result_array();
 
-					foreach ($channels as $key => $channel) {
-						if (count($groups)) {
-							foreach ($groups as $group) {
-								if ($channel['channel_id'] == $group['channel_id']) {
-									$results[] = $channel;
-									break;
+						foreach ($channels as $key => $channel) {
+							if (count($groups)) {
+								foreach ($groups as $group) {
+									if ($channel['channel_id'] == $group['channel_id']) {
+										$results[] = $channel;
+										break;
+									}
 								}
+							} else {
+								$results = $this->EE->TMPL->no_results();
 							}
-						} else {
-							$results = $channels;
 						}
+					} else {
+
+						$results = $channels;
 					}
+
 
 					$this->EE->session->cache['getchannels'][$site_id]['channels'] = $results;
 				}
+
 			} else {
 				$results = $this->EE->session->cache['getchannels'][$site_id]['channels'];
 			}
@@ -147,7 +160,7 @@ class Getchannels {
 			------------------------------------------------------
 
 			Examples:
-			{exp:getchannels site_id="site_id"}
+			{exp:getchannels site_id="site_id" restricted="no"}
 				{channel_id}<br/>
 				{channel_name}<br/>
 				{channel_title}<br/>
@@ -157,8 +170,8 @@ class Getchannels {
 			------------------------------------------------------
 
 			Parameters:
-
 			site_id="1" : Optional (default: use the current site_id)
+			restricted="yes|no": Optional. Only get logged in member authorized channels. No effect if Super Admin (default: "yes")
 
 		<?php
 		$buffer = ob_get_contents();
