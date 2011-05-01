@@ -70,7 +70,7 @@ class Getchannels {
 	{
 		//Get parameters
 		$site_id = $this->EE->TMPL->fetch_param('site_id') ? $this->EE->TMPL->fetch_param('site_id') : $this->_ee->config->item('site_id');
-		$restricted = $this->EE->TMPL->fetch_param('restricted') ? $this->EE->TMPL->fetch_param('restricted') : TRUE;
+		$restricted = $this->EE->TMPL->fetch_param('restricted') ? $this->EE->TMPL->fetch_param('restricted') : "yes";
 
 		//check site id
 		if ($site_id == "" && !is_numeric($site_id)) {
@@ -80,14 +80,14 @@ class Getchannels {
 		} else {
 
 			//Check if cache is available
-			if ( ! isset($this->EE->session->cache['getchannels'][$site_id]['channels'])) {
+			if ( ! isset($this->EE->session->cache['getchannels'][$site_id]['restricted_'.$restricted]['channels'])) {
 
 				$this->EE->db->select('exp_channels.channel_id, exp_channels.channel_name, exp_channels.channel_title, COUNT(exp_channel_data.entry_id) as total_entries')
-						->from('exp_channels')
-						->join('exp_channel_data', 'exp_channels.channel_id = exp_channel_data.channel_id', 'left')
-						->where('exp_channels.site_id', $site_id)
-						->group_by('exp_channels.channel_id')
-						->order_by('exp_channels.channel_name', 'ASC');
+								->from('exp_channels')
+								->join('exp_channel_data', 'exp_channels.channel_id = exp_channel_data.channel_id', 'left')
+								->where('exp_channels.site_id', $site_id)
+								->group_by('exp_channels.channel_id')
+								->order_by('exp_channels.channel_name', 'ASC');
 
 				$channels = $this->EE->db->get()->result_array();
 
@@ -99,8 +99,7 @@ class Getchannels {
 
 					// Check channels member groups?
 					// Omitting if member_group is 1 (Super Admin)
-					if ($this->EE->session->userdata["group_id"] != 1 AND ($restricted === TRUE OR $restricted === 'yes')) {
-						
+					if ($this->EE->session->userdata["group_id"] != 1 AND $restricted === 'yes') {
 						$this->EE->db->select('*')
 								->from('exp_channel_member_groups')
 								->where('exp_channel_member_groups.group_id', $this->EE->session->userdata["group_id"]);
@@ -125,11 +124,11 @@ class Getchannels {
 					}
 
 
-					$this->EE->session->cache['getchannels'][$site_id]['channels'] = $results;
+					$this->EE->session->cache['getchannels'][$site_id]['restricted_'.$restricted]['channels'] = $results;
 				}
 
 			} else {
-				$results = $this->EE->session->cache['getchannels'][$site_id]['channels'];
+				$results = $this->EE->session->cache['getchannels'][$site_id]['restricted_'.$restricted]['channels'];
 			}
 		}
 
@@ -171,7 +170,7 @@ class Getchannels {
 
 			Parameters:
 			site_id="1" : Optional (default: use the current site_id)
-			restricted="yes|no": Optional. Only get logged in member authorized channels. No effect if Super Admin (default: "yes")
+			restricted="yes|no": Optional. Only get logged in member authorized channels (default: "yes")
 
 		<?php
 		$buffer = ob_get_contents();
