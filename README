@@ -1,0 +1,19 @@
+Returns Channels of a site.
+
+(c) Copyright 2011 Pv Ledoux
+Author: pvledoux@gmail.com
+------------------------------------------------------
+
+Examples:
+{exp:getchannels site_id="site_id"}
+	{channel_id}<br/>
+	{channel_name}<br/>
+	{channel_title}<br/>
+	{total_entries}
+{/exp:getchannels}
+
+------------------------------------------------------
+
+Parameters:
+
+site_id="1" : Optional (default: use the current site_id)
