@@ -13,13 +13,13 @@ if ( ! defined('BASEPATH')) exit('No direct script access allowed');
  *
  */
 $plugin_info = array(
-	'pi_name'		=> 'Pvl - Get Channels',
-	'pi_version'		=>'0.1',
-	'pi_author'		=>'Pierre-Vincent Ledoux',
+	'pi_name'			=> 'Pvl - Get Channels',
+	'pi_version'		=>'0.2',
+	'pi_author'			=>'Pierre-Vincent Ledoux',
 	'pi_author_email'	=>'pvledoux@gmail.com',
 	'pi_author_url'		=> 'http://twitter.com/pvledoux/',
 	'pi_description'	=> 'Returns the list of channels for a site',
-	'pi_usage'		=> Getchannels::usage()
+	'pi_usage'			=> Getchannels::usage()
 );
 
 class Getchannels {
@@ -41,8 +41,9 @@ class Getchannels {
 	 */
 	public function __construct()
 	{
-		$this->EE =& get_instance();
-		$this->return_data = $this->EE->TMPL->parse_variables($this->EE->TMPL->tagdata, $this->_fetch());
+		$this->_ee			=& get_instance();
+		$result				= $this->_ee->TMPL->parse_variables($this->_ee->TMPL->tagdata, $this->_fetch());
+		$this->return_data	= $this->_ee->TMPL->parse_variables($result, array($this->_ee->config->_global_vars));
 	}
 
 
@@ -61,74 +62,61 @@ class Getchannels {
 
 
 	/**
-	 * Return Channels Array
-	 *
-	 * @access	private
-	 * @return	array
-	 */
+	* Return Channels Array
+	*
+	* @access	private
+	* @return	array
+	*/
 	private function _fetch()
 	{
-		//Get parameters
-		$site_id = $this->EE->TMPL->fetch_param('site_id') ? $this->EE->TMPL->fetch_param('site_id') : $this->_ee->config->item('site_id');
-		$restricted = $this->EE->TMPL->fetch_param('restricted') ? $this->EE->TMPL->fetch_param('restricted') : "yes";
+		//Get parameter
+    	$site_id = $this->_ee->TMPL->fetch_param('site_id', $this->_ee->config->item('site_id'));
 
 		//check site id
 		if ($site_id == "" && !is_numeric($site_id)) {
-			
 			$this->return_data =  "ERROR: site_id parameter MUST BE supplied and numeric.";
-
 		} else {
 
 			//Check if cache is available
-			if ( ! isset($this->EE->session->cache['getchannels'][$site_id]['restricted_'.$restricted]['channels'])) {
+			if ( ! isset($this->_ee->session->cache['getchannels'][$site_id]['channels'])) {
 
-				$this->EE->db->select('exp_channels.channel_id, exp_channels.channel_name, exp_channels.channel_title, COUNT(exp_channel_data.entry_id) as total_entries')
+				$this->_ee->db->select('exp_channels.channel_id, exp_channels.channel_name, exp_channels.channel_title, COUNT(exp_channel_data.entry_id) as total_entries')
 								->from('exp_channels')
 								->join('exp_channel_data', 'exp_channels.channel_id = exp_channel_data.channel_id', 'left')
 								->where('exp_channels.site_id', $site_id)
 								->group_by('exp_channels.channel_id')
 								->order_by('exp_channels.channel_name', 'ASC');
 
-				$channels = $this->EE->db->get()->result_array();
+				$channels = $this->_ee->db->get()->result_array();
 
 				if (count($channels) === 0) {
-					
-					$results[] = $this->EE->TMPL->no_results();
-
+					$results[] = array('no_results' => TRUE);
 				} else {
 
-					// Check channels member groups?
-					// Omitting if member_group is 1 (Super Admin)
-					if ($this->EE->session->userdata["group_id"] != 1 AND $restricted === 'yes') {
-						$this->EE->db->select('*')
+					//Check channels member groups
+					$this->_ee->db->select('*')
 								->from('exp_channel_member_groups')
-								->where('exp_channel_member_groups.group_id', $this->EE->session->userdata["group_id"]);
+								->where('exp_channel_member_groups.group_id', $this->_ee->session->userdata["group_id"]);
 
-						$groups = $this->EE->db->get()->result_array();
+					$groups = $this->_ee->db->get()->result_array();
 
-						foreach ($channels as $key => $channel) {
-							if (count($groups)) {
-								foreach ($groups as $group) {
-									if ($channel['channel_id'] == $group['channel_id']) {
-										$results[] = $channel;
-										break;
-									}
+					foreach ($channels as $key => $channel) {
+						if (count($groups)) {
+							foreach ($groups as $group) {
+								if ($channel['channel_id'] == $group['channel_id']) {
+									$results[] = $channel;
+									break;
 								}
-							} else {
-								$results = $this->EE->TMPL->no_results();
 							}
+						} else {
+							$results = $channels;
 						}
-					} else {
-
-						$results = $channels;
 					}
 
-
-					$this->EE->session->cache['getchannels'][$site_id]['restricted_'.$restricted]['channels'] = $results;
+					$this->_ee->session->cache['getchannels'][$site_id]['channels'] = $results;
 				}
-
 			} else {
-				$results = $this->EE->session->cache['getchannels'][$site_id]['restricted_'.$restricted]['channels'];
+				$results = $this->_ee->session->cache['getchannels'][$site_id]['channels'];
 			}
 		}
 
@@ -152,8 +140,8 @@ class Getchannels {
 			Description:
 
 			Returns Channels of a site.
-			
-			(c) Copyright 2011 Pv Ledoux
+
+			(c) Copyright 2012 Pv Ledoux
 
 			Author: pvledoux@gmail.com
 			------------------------------------------------------
@@ -186,4 +174,3 @@ class Getchannels {
 
 /* End of file pi.pi.getchannels.php */
 /* Location: ./system/expressionengine/third_party/getchannels/pi.getchannels.php */
-
